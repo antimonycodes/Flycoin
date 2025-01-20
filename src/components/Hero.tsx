@@ -26,7 +26,7 @@ const Hero = () => {
         <h1 className="text-stroke text-3xl mobile:text-[2.7rem] sm:text-6xl  md:text-7xl font-bold text-[#994F00] mt-2">
           Fly High with
         </h1>
-        <h1 className=" text-4xl mobile:text-[2.7rem] sm:text-6xl  md:text-7xl font-bold text-[#994F00] mt-2 tracking-[7%] text-stroke">
+        <h1 className=" text-3xl mobile:text-[2.7rem] sm:text-6xl  md:text-7xl font-bold text-[#994F00] mt-2 tracking-[7%] text-stroke">
           FlyCoin!
         </h1>
         <div className=" absolute bottom-0 md:bottom-32 right-12  w-[20%] animate-cloud-3">
