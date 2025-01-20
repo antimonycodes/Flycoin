@@ -154,6 +154,17 @@ button:focus-visible {
     transform: translateY(0);
   }
 }
+@keyframes cloudMove4 {
+  0% {
+    transform: translateY(0);
+  }
+  60% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(-20);
+  }
+}
 
 .animate-cloud-1 {
   animation: cloudMove1 7s ease-in-out infinite;
@@ -165,6 +176,9 @@ button:focus-visible {
 
 .animate-cloud-3 {
   animation: cloudMove3 5s ease-in-out infinite;
+}
+.animate-cloud-4 {
+  animation: cloudMove4 5s ease-in-out infinite;
 }
 
 /* Option 2: Using repeating-linear-gradient */
@@ -253,4 +267,28 @@ button:focus-visible {
 
 .div-spacing {
   @apply px-4 mobile:px-8 md:px-24;
+}
+
+#feather {
+  /* animation: eye 3s ease infinite; */
+}
+#featherr {
+}
+
+#eye {
+  /* animation: eye 3s ease infinite;
+  transform-origin: center;
+  transform-box: fill-box; */
+  animation: eye 3s ease infinite;
+  transform-origin: 50% 50%;
+  transform-box: fill-box;
+}
+
+@keyframes eye {
+  from {
+    transform: rotateZ(0deg);
+  }
+  to {
+    transform: rotateZ(360deg);
+  }
 }

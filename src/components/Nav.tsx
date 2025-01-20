@@ -1,6 +1,7 @@
 import { useState } from "react";
-import logo from "../assets/logo.png";
+import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
+import logo from "../assets/logo.png";
 
 interface NavProps {
   activeLink: string;
@@ -23,65 +24,152 @@ const Nav: React.FC<NavProps> = ({
   ];
 
   const handleItemClick = (sectionId: string, activeLinkValue: string) => {
-    console.log(sectionId);
     scrollToSection(sectionId);
     setActiveLink(activeLinkValue);
     setMenuOpen(false);
   };
 
+  const menuVariants = {
+    closed: {
+      opacity: 0,
+      scale: 0.95,
+      y: -20,
+      transition: {
+        duration: 0.2,
+      },
+    },
+    open: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: {
+        duration: 0.4,
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
+
+  const itemVariants = {
+    closed: {
+      opacity: 0,
+      x: -20,
+      transition: {
+        duration: 0.2,
+      },
+    },
+    open: {
+      opacity: 1,
+      x: 0,
+      transition: {
+        duration: 0.4,
+      },
+    },
+  };
+
+  const iconVariants = {
+    closed: { rotate: 0 },
+    open: { rotate: 180 },
+  };
+
   return (
-    <div className="fixed z-50 w-full top-0  px-4">
+    <div className="fixed z-50 w-full top-0 px-4">
       <nav className="flex items-center justify-between px-2 sm:px-6 py-4">
         {/* Logo */}
-        <div className="flex items-center gap-2 bg-[#E98112] border-[4.35px] border-[#FFB86C] py-2 px-4 md:px-8 rounded-[21.89px]">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          className="flex items-center gap-2 bg-[#E98112] border-[4.35px] border-[#FFB86C] py-2 px-4 md:px-8 rounded-[21.89px]"
+        >
           <div className="w-8">
             <img src={logo} alt="Fly Coin Logo" className="w-full" />
           </div>
           <span className="text-white font-bold text-base lg:text-[28px]">
             Fly Coin
           </span>
-        </div>
+        </motion.div>
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center space-x-8 bg-[#E98112] border-[4.35px] border-[#FFB86C] py-4 px-8 rounded-[21.89px]">
           {navItems.map(({ name, sectionId }) => (
-            <h3
+            <motion.div
               key={sectionId}
-              className={`cursor-pointer text-white text-xs lg:text-[20px] ${
-                activeLink === sectionId ? "font-bold underline" : ""
-              } ${sectionId === "BuyToken" && " border px-4 py-2 rounded-lg "}`}
-              onClick={() => handleItemClick(sectionId, sectionId)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="relative"
             >
-              {name}
-            </h3>
-          ))}
-        </div>
-
-        {/* Mobile Menu Toggle */}
-        <div className="md:hidden" onClick={() => setMenuOpen((prev) => !prev)}>
-          {menuOpen ? (
-            <X className="text-[#E98112] w-8 h-8" />
-          ) : (
-            <Menu className="text-[#E98112] w-8 h-8" />
-          )}
-        </div>
-
-        {/* Mobile Menu */}
-        {menuOpen && (
-          <div className="absolute top-16 left-0 w-full bg-[#E98112] border-t border-[#FFB86C] p-4 flex flex-col space-y-4 z-20">
-            {navItems.map(({ name, sectionId }) => (
               <h3
-                key={sectionId}
-                className={`cursor-pointer text-white text-base ${
-                  activeLink === sectionId ? "font-bold underline" : ""
-                } `}
+                className={`cursor-pointer text- text-xs lg:text-[20px] ${
+                  sectionId === "BuyToken"
+                    ? "border px-4 py-3 rounded-lg text-[#522F11] bg-white"
+                    : "text-white"
+                }`}
                 onClick={() => handleItemClick(sectionId, sectionId)}
               >
                 {name}
               </h3>
-            ))}
-          </div>
-        )}
+              {activeLink === sectionId && activeLink != "BuyToken" && (
+                <motion.div
+                  className="absolute left-0 bottom-[-4px] h-[3px] bg-[#994F00]"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 0.4, ease: "easeInOut" }}
+                ></motion.div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Mobile Menu Toggle */}
+        <motion.div
+          className="md:hidden cursor-pointer fixed z-[999] top-6 right-6"
+          onClick={() => setMenuOpen((prev) => !prev)}
+          animate={menuOpen ? "open" : "closed"}
+          variants={iconVariants}
+        >
+          <motion.div
+            initial={false}
+            animate={{ rotate: menuOpen ? 90 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {menuOpen ? (
+              <X className="text-[#ffff] w-8 h-8" />
+            ) : (
+              <Menu className="text-[#ffff] w-8 h-8" />
+            )}
+          </motion.div>
+        </motion.div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              initial="closed"
+              animate="open"
+              exit="closed"
+              variants={menuVariants}
+              className="absolute top-0 left-0 w-full h-screen bg-[#E98112] border-t border-[#FFB86C] p-4 flex flex-col space-y-4 z-20"
+            >
+              <div className=" flex flex-col gap-6 items-center justify-center h-full">
+                {navItems.map(({ name, sectionId }) => (
+                  <motion.h3
+                    key={sectionId}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.05, x: 10 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`cursor-pointer text-white text-base block ${
+                      activeLink === sectionId ? "font-bold " : ""
+                    }`}
+                    onClick={() => handleItemClick(sectionId, sectionId)}
+                  >
+                    {name}
+                  </motion.h3>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
     </div>
   );
