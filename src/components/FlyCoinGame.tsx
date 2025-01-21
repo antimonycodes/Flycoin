@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 // import { motion, AnimatePresence } from "framer-motion";
 import { Volume2, VolumeX, Trophy, Star, Coins } from "lucide-react";
 // import logo from "../assets/logo.png";
