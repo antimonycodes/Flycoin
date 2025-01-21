@@ -8,7 +8,7 @@ import Faq from "./components/Home/Faq";
 import Footer from "./components/Home/Footer";
 import Nav from "./components/Nav"; // Import the Nav component
 import { useState } from "react";
-import FlyCoinGame from "./components/FlycoinGame";
+import FlyCoinGame from "./components/FlyCoinGame";
 
 const App = () => {
   const [activeLink, setActiveLink] = useState<string>("Home");
