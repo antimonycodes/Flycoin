@@ -8,6 +8,7 @@ import Faq from "./components/Home/Faq";
 import Footer from "./components/Home/Footer";
 import Nav from "./components/Nav"; // Import the Nav component
 import { useState } from "react";
+import FlyCoinGame from "./components/FlycoinGame";
 
 const App = () => {
   const [activeLink, setActiveLink] = useState<string>("Home");
@@ -46,6 +47,8 @@ const App = () => {
       </div>
       <div id="BuyToken">
         <Roadmap />
+        <FlyCoinGame />
+
         <Faq />
       </div>
       <Footer />
