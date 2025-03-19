@@ -1,7 +1,7 @@
 const Sponsor = () => {
   const brands = [
     "FlyCoin",
-    "FLyCoin",
+    "FLyCoin.",
     "FlyCoin",
     "FLyCoin",
     "FlyCoin",

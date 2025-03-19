@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-// import { motion, AnimatePresence } from "framer-motion";
 import { Volume2, VolumeX, Trophy, Star, Coins } from "lucide-react";
-// import logo from "../assets/logo.png";
 
 interface Achievement {
   id: string;
@@ -23,17 +21,29 @@ interface Coin {
   collected: boolean;
 }
 
+interface Star {
+  id: number;
+  position: { x: number; y: number };
+  collected: boolean;
+}
+
 const FlyCoinGame = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
+  const [highScore, setHighScore] = useState(() => {
+    // Initialize high score from local storage
+    const savedHighScore = localStorage.getItem("flyCoinGameHighScore");
+    return savedHighScore ? parseInt(savedHighScore, 10) : 0;
+  });
   const [birdPosition, setBirdPosition] = useState(300);
   const [obstacleHeight, setObstacleHeight] = useState(200);
   const [obstacleLeft, setObstacleLeft] = useState(800);
   const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
   const [coins, setCoins] = useState<Coin[]>([]);
+  const [stars, setStars] = useState<Star[]>([]);
   const [coinsCollected, setCoinsCollected] = useState(0);
+  const [starsCollected, setStarsCollected] = useState(0);
   const [muted, setMuted] = useState(false);
   const [activeEffects, setActiveEffects] = useState({
     shield: false,
@@ -41,7 +51,6 @@ const FlyCoinGame = () => {
     slowTime: false,
   });
 
-  // const [collectedCoins, setCollectedCoins] = useState<number>(0);
   const gravity = 3;
   const jumpHeight = 70;
   const obstacleWidth = 60;
@@ -65,8 +74,230 @@ const FlyCoinGame = () => {
       achieved: false,
       icon: <Coins className="w-6 h-6 text-yellow-400" />,
     },
+    {
+      id: "star-collector",
+      name: "Star Gazer",
+      description: "Collect 5 stars",
+      achieved: false,
+      icon: <Star className="w-6 h-6 text-yellow-400" />,
+    },
   ]);
 
+  // Move coins and stars
+  useEffect(() => {
+    if (gameStarted && !gameOver) {
+      const moveItemsInterval = setInterval(() => {
+        // Move coins
+        setCoins((prevCoins) =>
+          prevCoins
+            .map((coin) => ({
+              ...coin,
+              position: { ...coin.position, x: coin.position.x - 5 },
+            }))
+            .filter((coin) => coin.position.x > -20)
+        );
+
+        // Move stars
+        setStars((prevStars) =>
+          prevStars
+            .map((star) => ({
+              ...star,
+              position: { ...star.position, x: star.position.x - 5 },
+            }))
+            .filter((star) => star.position.x > -20)
+        );
+      }, 24);
+
+      return () => clearInterval(moveItemsInterval);
+    }
+  }, [gameStarted, gameOver]);
+
+  // Spawn coins and stars
+  useEffect(() => {
+    if (gameStarted && !gameOver) {
+      const spawnInterval = setInterval(() => {
+        // Spawn a coin
+        const newCoin: Coin = {
+          id: Date.now(),
+          position: {
+            x: 800,
+            y: Math.random() * 560,
+          },
+          collected: false,
+        };
+        setCoins((prevCoins) => [...prevCoins, newCoin]);
+
+        // Spawn a star
+        const newStar: Star = {
+          id: Date.now() + 1,
+          position: {
+            x: 800,
+            y: Math.random() * 560,
+          },
+          collected: false,
+        };
+        setStars((prevStars) => [...prevStars, newStar]);
+      }, 3000); // Spawn every 3 seconds
+
+      return () => clearInterval(spawnInterval);
+    }
+  }, [gameStarted, gameOver]);
+
+  // Collision detection for stars and coins
+  useEffect(() => {
+    if (gameStarted && !gameOver) {
+      // Check collision with coins
+      const updatedCoins = coins.map((coin) => {
+        const birdRight = 100 + 40; // bird width
+        const birdBottom = birdPosition + 40; // bird height
+        const coinRight = coin.position.x + 20;
+        const coinBottom = coin.position.y + 20;
+
+        const collision =
+          !coin.collected &&
+          birdRight > coin.position.x &&
+          100 < coinRight &&
+          birdPosition < coinBottom &&
+          birdBottom > coin.position.y;
+
+        if (collision) {
+          setCoinsCollected((prev) => prev + 1);
+        }
+
+        return collision ? { ...coin, collected: true } : coin;
+      });
+      setCoins(updatedCoins.filter((coin) => !coin.collected));
+
+      // Check collision with stars (similar logic)
+      const updatedStars = stars.map((star) => {
+        const birdRight = 100 + 40;
+        const birdBottom = birdPosition + 40;
+        const starRight = star.position.x + 20;
+        const starBottom = star.position.y + 20;
+
+        const collision =
+          !star.collected &&
+          birdRight > star.position.x &&
+          100 < starRight &&
+          birdPosition < starBottom &&
+          birdBottom > star.position.y;
+
+        if (collision) {
+          setStarsCollected((prev) => prev + 1);
+        }
+
+        return collision ? { ...star, collected: true } : star;
+      });
+      setStars(updatedStars.filter((star) => !star.collected));
+    }
+  }, [gameStarted, gameOver, birdPosition]);
+
+  // Spawn stars and coins at intervals
+  useEffect(() => {
+    if (gameStarted && !gameOver) {
+      const spawnInterval = setInterval(() => {
+        // Spawn a star
+        const newStar: Star = {
+          id: Date.now(),
+          position: {
+            x: 800,
+            y: Math.random() * 560,
+          },
+          collected: false,
+        };
+        setStars((prevStars) => [...prevStars, newStar]);
+
+        // Spawn a coin
+        const newCoin: Coin = {
+          id: Date.now(),
+          position: {
+            x: 800,
+            y: Math.random() * 560,
+          },
+          collected: false,
+        };
+        setCoins((prevCoins) => [...prevCoins, newCoin]);
+      }, 3000); // Spawn every 3 seconds
+
+      return () => clearInterval(spawnInterval);
+    }
+  }, [gameStarted, gameOver]);
+
+  // Update high score in local storage
+  useEffect(() => {
+    // Update high score if current score is higher
+    if (score > highScore) {
+      setHighScore(score);
+      localStorage.setItem("flyCoinGameHighScore", score.toString());
+    }
+  }, [score]);
+
+  // Collision detection for stars and coins
+  useEffect(() => {
+    if (gameStarted && !gameOver) {
+      // Check collision with stars
+      const updatedStars = stars.map((star) => {
+        const birdRight = 100 + birdWidth;
+        const birdBottom = birdPosition + birdHeight;
+        const starRight = star.position.x + 20; // Assuming star width is 20
+        const starBottom = star.position.y + 20; // Assuming star height is 20
+
+        const collision =
+          !star.collected &&
+          birdRight > star.position.x &&
+          100 < starRight &&
+          birdPosition < starBottom &&
+          birdBottom > star.position.y;
+
+        if (collision) {
+          setStarsCollected((prev) => prev + 1);
+          // Check star collector achievement
+          setAchievements((prev) =>
+            prev.map((achievement) =>
+              achievement.id === "star-collector" && starsCollected >= 4
+                ? { ...achievement, achieved: true }
+                : achievement
+            )
+          );
+        }
+
+        return collision ? { ...star, collected: true } : star;
+      });
+      setStars(updatedStars.filter((star) => !star.collected));
+
+      // Check collision with coins
+      const updatedCoins = coins.map((coin) => {
+        const birdRight = 100 + birdWidth;
+        const birdBottom = birdPosition + birdHeight;
+        const coinRight = coin.position.x + 20; // Assuming coin width is 20
+        const coinBottom = coin.position.y + 20; // Assuming coin height is 20
+
+        const collision =
+          !coin.collected &&
+          birdRight > coin.position.x &&
+          100 < coinRight &&
+          birdPosition < coinBottom &&
+          birdBottom > coin.position.y;
+
+        if (collision) {
+          setCoinsCollected((prev) => prev + 1);
+          // Check coin collector achievement
+          setAchievements((prev) =>
+            prev.map((achievement) =>
+              achievement.id === "coin-collector" && coinsCollected >= 9
+                ? { ...achievement, achieved: true }
+                : achievement
+            )
+          );
+        }
+
+        return collision ? { ...coin, collected: true } : coin;
+      });
+      setCoins(updatedCoins.filter((coin) => !coin.collected));
+    }
+  }, [gameStarted, gameOver, birdPosition]);
+
+  // Existing game logic for bird movement and obstacles (unchanged)
   useEffect(() => {
     let timeId: NodeJS.Timeout;
 
@@ -129,18 +360,24 @@ const FlyCoinGame = () => {
       setBirdPosition(300);
       setObstacleLeft(800);
       setScore(0);
+      setCoins([]);
+      setStars([]);
+      setCoinsCollected(0);
+      setStarsCollected(0);
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-primary py-16">
-      {/* <div className="mb-4 text-white text-2xl font-bold">Score: {score}</div> */}
-      {/* Score Display */}
       <div className="flex items-center gap-4 mb-4">
         <div className="text-white text-2xl font-bold">Score: {score}</div>
         <div className="flex items-center gap-2 text-yellow-400">
           <Coins className="w-6 h-6" />
           <span className="text-xl">{coinsCollected}</span>
+        </div>
+        <div className="flex items-center gap-2 text-white">
+          <Star className="w-6 h-6" />
+          <span className="text-xl">{starsCollected}</span>
         </div>
         <div className="text-white text-xl">High Score: {highScore}</div>
         <button
@@ -157,11 +394,11 @@ const FlyCoinGame = () => {
           )}
         </button>
       </div>
-      {/*  */}
+
       <div
         ref={gameContainerRef}
         onClick={handleClick}
-        className="relative w-[800px] h-[600px] border-4 border-white rounded-lg overflow-hidden bg-secondary cursor-pointer"
+        className="relative w-full lg:w-[800px] h-[600px] border-4 border-white rounded-lg overflow- bg-secndary cursor-pointer"
       >
         {!gameStarted ? (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -183,15 +420,15 @@ const FlyCoinGame = () => {
               <div className="w-1/4 h-1/4 bg-white rounded-full absolute top-1/4 left-1/4"></div>
             </div>
           </div>
-          {/* <img src={logo} alt="" /> */}
         </div>
 
+        {/* Obstacle blocks remain unchanged */}
         <div
           className="absolute bg-green-500"
           style={{
             width: obstacleWidth,
             height: obstacleHeight,
-            left: obstacleLeft,
+            // left: obstacleLeft,
             top: 0,
           }}
         />
@@ -199,11 +436,41 @@ const FlyCoinGame = () => {
           className="absolute bg-green-500"
           style={{
             width: obstacleWidth,
-            height: "100%",
-            left: obstacleLeft,
+            // height: "100%",
+            height: obstacleHeight + 40,
+
+            // left: obstacleLeft,
             top: obstacleHeight + 150,
           }}
         />
+
+        {/* Render stars */}
+        {/* {stars.map((star) => (
+          <div
+            key={star.id}
+            className="absolute"
+            style={{
+              left: `${star.position.x}px`,
+              top: `${star.position.y}px`,
+            }}
+          >
+            <Star className="text-yellow-300 w-5 h-5" />
+          </div>
+        ))} */}
+
+        {/* Render coins */}
+        {/* {coins.map((coin) => (
+          <div
+            key={coin.id}
+            className="absolute"
+            style={{
+              left: `${coin.position.x}px`,
+              top: `${coin.position.y}px`,
+            }}
+          >
+            <Coins className="text-yellow-500 w-5 h-5" />
+          </div>
+        ))} */}
 
         {gameOver ? (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -213,10 +480,11 @@ const FlyCoinGame = () => {
           </div>
         ) : null}
       </div>
-      {/* Achievements */}
+
+      {/* Achievements section */}
       <div className="mt-4 bg-white/10 rounded-lg p-4 w-[800px]">
         <div className="text-white font-bold mb-2">Achievements</div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {achievements.map((achievement) => (
             <div
               key={achievement.id}

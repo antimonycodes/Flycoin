@@ -2,7 +2,7 @@ import curveLine from "../../assets/curve-line.png";
 // import holderOne from "../../assets/holder-one.png";
 const Roadmap = () => {
   return (
-    <div className=" bg-[#522F11] flex flex-col items-center div-">
+    <div className=" bg-[#522F11] flex flex-col items-center ">
       {/* Curved header section */}
       <div className="relative w-full  ">
         {/* <div className="absolute inset-x-0 h-1 bg-[#FF9B3C] top-12 transform -skew-y-"></div> */}
@@ -12,7 +12,7 @@ const Roadmap = () => {
         <h1 className=" relative text-center text-stroke w-full text-nowrap text-[#522F11] text-3xl md:text-4xl lg:text-5xl">
           Roadmap
         </h1>
-        <img src={curveLine} alt="" />
+        <img src={curveLine} alt="" className=" w-full" />
       </div>
 
       {/* Cards container */}
