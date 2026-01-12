@@ -9,11 +9,7 @@ interface Achievement {
   icon: JSX.Element;
 }
 
-interface PowerUp {
-  id: number;
-  type: "shield" | "multiplier" | "slowTime";
-  position: { x: number; y: number };
-}
+
 
 interface Coin {
   id: number;
@@ -39,17 +35,14 @@ const FlyCoinGame = () => {
   const [birdPosition, setBirdPosition] = useState(300);
   const [obstacleHeight, setObstacleHeight] = useState(200);
   const [obstacleLeft, setObstacleLeft] = useState(800);
-  const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
+  const [obstacleGap, setObstacleGap] = useState(150);
+
   const [coins, setCoins] = useState<Coin[]>([]);
   const [stars, setStars] = useState<Star[]>([]);
   const [coinsCollected, setCoinsCollected] = useState(0);
   const [starsCollected, setStarsCollected] = useState(0);
   const [muted, setMuted] = useState(false);
-  const [activeEffects, setActiveEffects] = useState({
-    shield: false,
-    multiplier: false,
-    slowTime: false,
-  });
+
 
   const gravity = 3;
   const jumpHeight = 70;
@@ -299,7 +292,7 @@ const FlyCoinGame = () => {
 
   // Existing game logic for bird movement and obstacles (unchanged)
   useEffect(() => {
-    let timeId: NodeJS.Timeout;
+    let timeId: ReturnType<typeof setInterval>;
 
     if (gameStarted && !gameOver) {
       timeId = setInterval(() => {
@@ -318,13 +311,20 @@ const FlyCoinGame = () => {
   }, [gameStarted, gameOver, birdPosition]);
 
   useEffect(() => {
-    let obstacleId: NodeJS.Timeout;
+    let obstacleId: ReturnType<typeof setInterval>;
 
     if (gameStarted && !gameOver) {
       obstacleId = setInterval(() => {
         setObstacleLeft((left) => {
           if (left <= -obstacleWidth) {
             setScore((score) => score + 1);
+            const newGap = Math.floor(Math.random() * 60) + 140; // Gap between 140 and 200
+            const minHeight = 50;
+            const maxHeight = 600 - newGap - minHeight;
+            const newHeight = Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
+
+            setObstacleGap(newGap);
+            setObstacleHeight(newHeight);
             return 800;
           }
           return left - 5;
@@ -341,12 +341,12 @@ const FlyCoinGame = () => {
     const hasCollision =
       obstacleLeft >= 100 - birdWidth &&
       obstacleLeft <= 100 + birdWidth &&
-      (birdPosition <= obstacleHeight || birdPosition >= obstacleHeight + 150);
+      (birdPosition <= obstacleHeight || birdPosition >= obstacleHeight + obstacleGap);
 
     if (hasCollision) {
       setGameOver(true);
     }
-  }, [birdPosition, obstacleHeight, obstacleLeft]);
+  }, [birdPosition, obstacleHeight, obstacleLeft, obstacleGap]);
 
   const handleClick = () => {
     if (!gameStarted) {
@@ -428,7 +428,7 @@ const FlyCoinGame = () => {
           style={{
             width: obstacleWidth,
             height: obstacleHeight,
-            // left: obstacleLeft,
+            left: obstacleLeft,
             top: 0,
           }}
         />
@@ -437,15 +437,15 @@ const FlyCoinGame = () => {
           style={{
             width: obstacleWidth,
             // height: "100%",
-            height: obstacleHeight + 40,
+            height: 600 - obstacleHeight - obstacleGap,
 
-            // left: obstacleLeft,
-            top: obstacleHeight + 150,
+            left: obstacleLeft,
+            top: obstacleHeight + obstacleGap,
           }}
         />
 
         {/* Render stars */}
-        {/* {stars.map((star) => (
+        {stars.map((star) => (
           <div
             key={star.id}
             className="absolute"
@@ -456,10 +456,10 @@ const FlyCoinGame = () => {
           >
             <Star className="text-yellow-300 w-5 h-5" />
           </div>
-        ))} */}
+        ))}
 
         {/* Render coins */}
-        {/* {coins.map((coin) => (
+        {coins.map((coin) => (
           <div
             key={coin.id}
             className="absolute"
@@ -470,7 +470,7 @@ const FlyCoinGame = () => {
           >
             <Coins className="text-yellow-500 w-5 h-5" />
           </div>
-        ))} */}
+        ))}
 
         {gameOver ? (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -488,9 +488,8 @@ const FlyCoinGame = () => {
           {achievements.map((achievement) => (
             <div
               key={achievement.id}
-              className={`flex items-center gap-2 p-2 rounded-lg ${
-                achievement.achieved ? "bg-white/20" : "bg-white/5"
-              }`}
+              className={`flex items-center gap-2 p-2 rounded-lg ${achievement.achieved ? "bg-white/20" : "bg-white/5"
+                }`}
             >
               {achievement.icon}
               <div>
@@ -652,7 +651,7 @@ export default FlyCoinGame;
 
 //   // Bird movement and collision detection with boundaries
 //   useEffect(() => {
-//     let timeId: NodeJS.Timeout;
+//     let timeId: ReturnType<typeof setInterval>;
 
 //     if (gameStarted && !gameOver) {
 //       timeId = setInterval(() => {
@@ -693,7 +692,7 @@ export default FlyCoinGame;
 
 //   // Add back obstacle movement effect
 //   useEffect(() => {
-//     let obstacleId: NodeJS.Timeout;
+//     let obstacleId: ReturnType<typeof setInterval>;
 
 //     if (gameStarted && !gameOver) {
 //       obstacleId = setInterval(() => {
@@ -730,7 +729,7 @@ export default FlyCoinGame;
 
 //   // Add back coin movement effect
 //   useEffect(() => {
-//     let coinId: NodeJS.Timeout;
+//     let coinId: ReturnType<typeof setInterval>;
 
 //     if (gameStarted && !gameOver) {
 //       coinId = setInterval(() => {
