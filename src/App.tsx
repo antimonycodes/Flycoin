@@ -9,6 +9,13 @@ import Footer from "./components/Home/Footer";
 import Nav from "./components/Nav"; // Import the Nav component
 import { useState } from "react";
 import FlyCoinGame from "./components/FlyCoinGame";
+import AdmissionPage from "./components/AdmissionPage";
+import IVFHospitalManagement from "./components/Home/IVFHospitalManagement";
+import IVF from "./components/Home/Ivftwo";
+import IVFClinic from "./components/Home/IVFClinic";
+import OutfitCoordinatorDemo from "./components/Home/Outfit";
+import WorklogDashboard from "./components/Home/FLow";
+import TetrisGame from "./components/Tetris";
 
 const App = () => {
   const [activeLink, setActiveLink] = useState<string>("Home");
@@ -52,6 +59,13 @@ const App = () => {
         <Faq />
       </div>
       <Footer />
+      {/* <AdmissionPage /> */}
+      {/* <IVFHospitalManagement />
+      <IVF />
+      <IVFClinic />
+      <OutfitCoordinatorDemo />
+      <WorklogDashboard />
+      <TetrisGame /> */}
     </div>
   );
 };

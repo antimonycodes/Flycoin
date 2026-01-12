@@ -74,7 +74,7 @@ const Nav: React.FC<NavProps> = ({
 
   return (
     <div className="fixed z-50 w-full top-0 px-4">
-      <nav className="flex items-center justify-between px-2 sm:px-6 py-4">
+      <nav className="flex items-center justify-between px-2 sm:px-6 lg:px-20 py-4">
         {/* Logo */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
