@@ -31,3 +31,4 @@ src/components/Home/IVFClinic.tsx
 src/components/Home/Outfit.tsx
 src/components/Home/FLow.tsx
 src/components/Tetris.tsx
+src/components/SunburstBackground.tsx
