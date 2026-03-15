@@ -9,7 +9,12 @@ interface Achievement {
   icon: JSX.Element;
 }
 
-
+interface Obstacle {
+  id: number;
+  left: number;
+  gap: number;
+  height: number;
+}
 
 interface Coin {
   id: number;
@@ -28,30 +33,51 @@ const FlyCoinGame = () => {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(() => {
-    // Initialize high score from local storage
-    const savedHighScore = localStorage.getItem("flyCoinGameHighScore");
-    return savedHighScore ? parseInt(savedHighScore, 10) : 0;
+    if (typeof window !== "undefined") {
+      const savedHighScore = localStorage.getItem("flyCoinGameHighScore");
+      return savedHighScore ? parseInt(savedHighScore, 10) : 0;
+    }
+    return 0;
   });
   const [birdPosition, setBirdPosition] = useState(300);
-  const [obstacleHeight, setObstacleHeight] = useState(200);
-  const [obstacleLeft, setObstacleLeft] = useState(800);
-  const [obstacleGap, setObstacleGap] = useState(150);
+  const birdVelocityRef = useRef(0);
+  const [birdRotation, setBirdRotation] = useState(0);
+  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
 
   const [coins, setCoins] = useState<Coin[]>([]);
   const [stars, setStars] = useState<Star[]>([]);
   const [coinsCollected, setCoinsCollected] = useState(0);
   const [starsCollected, setStarsCollected] = useState(0);
   const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(muted);
 
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
 
-  const gravity = 3;
-  const jumpHeight = 70;
+  const playJump = () =>
+    !mutedRef.current &&
+    typeof window !== "undefined" &&
+    new Audio("/jump.mp3").play().catch(() => {});
+  const playCollect = () =>
+    !mutedRef.current &&
+    typeof window !== "undefined" &&
+    new Audio("/collect.mp3").play().catch(() => {});
+  const playGameOver = () =>
+    !mutedRef.current &&
+    typeof window !== "undefined" &&
+    new Audio("/gameover.mp3").play().catch(() => {});
+
+  const gravity = 0.4;
+  const jumpSpeed = -7;
+  const terminalVelocity = 8;
   const obstacleWidth = 60;
   const birdWidth = 40;
   const birdHeight = 40;
+  const gameSpeed = 4;
+  const gameHeight = 700;
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize achievements
   const [achievements, setAchievements] = useState<Achievement[]>([
     {
       id: "first-10",
@@ -76,296 +102,264 @@ const FlyCoinGame = () => {
     },
   ]);
 
-  // Move coins and stars
+  const generateObstacle = (leftPos: number): Obstacle => {
+    const newGap = Math.floor(Math.random() * 80) + 180; // Gap between 180 and 260
+    const minHeight = 50;
+    const maxHeight = gameHeight - newGap - minHeight;
+    const newHeight =
+      Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
+    return {
+      id: Math.random(),
+      left: leftPos,
+      gap: newGap,
+      height: newHeight,
+    };
+  };
+
   useEffect(() => {
+    let loopId: ReturnType<typeof setInterval>;
     if (gameStarted && !gameOver) {
-      const moveItemsInterval = setInterval(() => {
-        // Move coins
-        setCoins((prevCoins) =>
-          prevCoins
-            .map((coin) => ({
-              ...coin,
-              position: { ...coin.position, x: coin.position.x - 5 },
+      loopId = setInterval(() => {
+        birdVelocityRef.current = Math.min(
+          birdVelocityRef.current + gravity,
+          terminalVelocity,
+        );
+        const curVel = birdVelocityRef.current;
+
+        setBirdPosition((prev) => {
+          let newPos = prev + curVel;
+          if (newPos >= gameHeight - birdHeight || newPos <= 0) {
+            newPos = Math.max(0, Math.min(newPos, gameHeight - birdHeight));
+            setGameOver((prevGameOver) => {
+              if (!prevGameOver) playGameOver();
+              return true;
+            });
+          }
+          return newPos;
+        });
+
+        setBirdRotation(Math.min(Math.max(curVel * 4, -25), 90));
+
+        setObstacles((prev) => {
+          let updated = prev.map((obs) => ({
+            ...obs,
+            left: obs.left - gameSpeed,
+          }));
+          const onScreen = updated.filter((obs) => obs.left > -obstacleWidth);
+          if (updated.length > onScreen.length) {
+            setScore((s) => s + (updated.length - onScreen.length));
+          }
+          if (
+            onScreen.length === 0 ||
+            onScreen[onScreen.length - 1].left < 800 - 300
+          ) {
+            onScreen.push(generateObstacle(800));
+          }
+          return onScreen;
+        });
+
+        setCoins((prev) =>
+          prev
+            .map((c) => ({
+              ...c,
+              position: { ...c.position, x: c.position.x - gameSpeed },
             }))
-            .filter((coin) => coin.position.x > -20)
+            .filter((c) => c.position.x > -20 && !c.collected),
         );
 
-        // Move stars
-        setStars((prevStars) =>
-          prevStars
-            .map((star) => ({
-              ...star,
-              position: { ...star.position, x: star.position.x - 5 },
+        setStars((prev) =>
+          prev
+            .map((s) => ({
+              ...s,
+              position: { ...s.position, x: s.position.x - gameSpeed },
             }))
-            .filter((star) => star.position.x > -20)
+            .filter((s) => s.position.x > -20 && !s.collected),
         );
       }, 24);
-
-      return () => clearInterval(moveItemsInterval);
     }
+    return () => clearInterval(loopId);
   }, [gameStarted, gameOver]);
 
-  // Spawn coins and stars
   useEffect(() => {
+    let spawnId: ReturnType<typeof setInterval>;
     if (gameStarted && !gameOver) {
-      const spawnInterval = setInterval(() => {
-        // Spawn a coin
-        const newCoin: Coin = {
-          id: Date.now(),
-          position: {
-            x: 800,
-            y: Math.random() * 560,
-          },
-          collected: false,
-        };
-        setCoins((prevCoins) => [...prevCoins, newCoin]);
-
-        // Spawn a star
-        const newStar: Star = {
-          id: Date.now() + 1,
-          position: {
-            x: 800,
-            y: Math.random() * 560,
-          },
-          collected: false,
-        };
-        setStars((prevStars) => [...prevStars, newStar]);
-      }, 3000); // Spawn every 3 seconds
-
-      return () => clearInterval(spawnInterval);
-    }
-  }, [gameStarted, gameOver]);
-
-  // Collision detection for stars and coins
-  useEffect(() => {
-    if (gameStarted && !gameOver) {
-      // Check collision with coins
-      const updatedCoins = coins.map((coin) => {
-        const birdRight = 100 + 40; // bird width
-        const birdBottom = birdPosition + 40; // bird height
-        const coinRight = coin.position.x + 20;
-        const coinBottom = coin.position.y + 20;
-
-        const collision =
-          !coin.collected &&
-          birdRight > coin.position.x &&
-          100 < coinRight &&
-          birdPosition < coinBottom &&
-          birdBottom > coin.position.y;
-
-        if (collision) {
-          setCoinsCollected((prev) => prev + 1);
+      spawnId = setInterval(() => {
+        if (Math.random() > 0.5) {
+          setCoins((prev) => [
+            ...prev,
+            {
+              id: Math.random(),
+              position: { x: 800, y: Math.random() * 500 + 50 },
+              collected: false,
+            },
+          ]);
+        } else {
+          setStars((prev) => [
+            ...prev,
+            {
+              id: Math.random(),
+              position: { x: 800, y: Math.random() * 500 + 50 },
+              collected: false,
+            },
+          ]);
         }
-
-        return collision ? { ...coin, collected: true } : coin;
-      });
-      setCoins(updatedCoins.filter((coin) => !coin.collected));
-
-      // Check collision with stars (similar logic)
-      const updatedStars = stars.map((star) => {
-        const birdRight = 100 + 40;
-        const birdBottom = birdPosition + 40;
-        const starRight = star.position.x + 20;
-        const starBottom = star.position.y + 20;
-
-        const collision =
-          !star.collected &&
-          birdRight > star.position.x &&
-          100 < starRight &&
-          birdPosition < starBottom &&
-          birdBottom > star.position.y;
-
-        if (collision) {
-          setStarsCollected((prev) => prev + 1);
-        }
-
-        return collision ? { ...star, collected: true } : star;
-      });
-      setStars(updatedStars.filter((star) => !star.collected));
+      }, 2000);
     }
-  }, [gameStarted, gameOver, birdPosition]);
-
-  // Spawn stars and coins at intervals
-  useEffect(() => {
-    if (gameStarted && !gameOver) {
-      const spawnInterval = setInterval(() => {
-        // Spawn a star
-        const newStar: Star = {
-          id: Date.now(),
-          position: {
-            x: 800,
-            y: Math.random() * 560,
-          },
-          collected: false,
-        };
-        setStars((prevStars) => [...prevStars, newStar]);
-
-        // Spawn a coin
-        const newCoin: Coin = {
-          id: Date.now(),
-          position: {
-            x: 800,
-            y: Math.random() * 560,
-          },
-          collected: false,
-        };
-        setCoins((prevCoins) => [...prevCoins, newCoin]);
-      }, 3000); // Spawn every 3 seconds
-
-      return () => clearInterval(spawnInterval);
-    }
+    return () => clearInterval(spawnId);
   }, [gameStarted, gameOver]);
 
-  // Update high score in local storage
   useEffect(() => {
-    // Update high score if current score is higher
+    if (!gameStarted || gameOver) return;
+    // Forgiving hitbox by trimming 5 pixels off each edge
+    const padding = 5;
+    const birdLeft = 100 + padding;
+    const birdRight = 100 + birdWidth - padding;
+    const birdTop = birdPosition + padding;
+    const birdBottom = birdPosition + birdHeight - padding;
+
+    const hitObstacle = obstacles.some((obs) => {
+      const hitHorizontal =
+        obs.left <= birdRight && obs.left + obstacleWidth >= birdLeft;
+      const hitVertical =
+        birdTop <= obs.height || birdBottom >= obs.height + obs.gap;
+      return hitHorizontal && hitVertical;
+    });
+
+    if (hitObstacle) {
+      setGameOver((prev) => {
+        if (!prev) playGameOver();
+        return true;
+      });
+      return;
+    }
+
+    let newCoins = 0;
+    const updatedCoins = coins.map((c) => {
+      if (c.collected) return c;
+      const hit =
+        c.position.x <= birdRight &&
+        c.position.x + 20 >= 100 &&
+        c.position.y <= birdBottom &&
+        c.position.y + 20 >= birdPosition;
+      if (hit) newCoins++;
+      return hit ? { ...c, collected: true } : c;
+    });
+
+    if (newCoins > 0) {
+      playCollect();
+      setCoinsCollected((prev) => prev + newCoins);
+      setCoins(updatedCoins);
+    }
+
+    let newStars = 0;
+    const updatedStars = stars.map((s) => {
+      if (s.collected) return s;
+      const hit =
+        s.position.x <= birdRight &&
+        s.position.x + 20 >= 100 &&
+        s.position.y <= birdBottom &&
+        s.position.y + 20 >= birdPosition;
+      if (hit) newStars++;
+      return hit ? { ...s, collected: true } : s;
+    });
+
+    if (newStars > 0) {
+      playCollect();
+      setStarsCollected((prev) => prev + newStars);
+      setStars(updatedStars);
+    }
+  }, [gameStarted, gameOver, birdPosition, obstacles, coins, stars]);
+
+  useEffect(() => {
+    setAchievements((prev) => {
+      let changed = false;
+      const next = prev.map((a) => {
+        if (a.id === "first-10" && score >= 10 && !a.achieved) {
+          changed = true;
+          return { ...a, achieved: true };
+        }
+        if (a.id === "coin-collector" && coinsCollected >= 10 && !a.achieved) {
+          changed = true;
+          return { ...a, achieved: true };
+        }
+        if (a.id === "star-collector" && starsCollected >= 5 && !a.achieved) {
+          changed = true;
+          return { ...a, achieved: true };
+        }
+        return a;
+      });
+      return changed ? next : prev;
+    });
     if (score > highScore) {
       setHighScore(score);
-      localStorage.setItem("flyCoinGameHighScore", score.toString());
+      if (typeof window !== "undefined") {
+        localStorage.setItem("flyCoinGameHighScore", score.toString());
+      }
     }
-  }, [score]);
+  }, [score, highScore, coinsCollected, starsCollected]);
 
-  // Collision detection for stars and coins
-  useEffect(() => {
-    if (gameStarted && !gameOver) {
-      // Check collision with stars
-      const updatedStars = stars.map((star) => {
-        const birdRight = 100 + birdWidth;
-        const birdBottom = birdPosition + birdHeight;
-        const starRight = star.position.x + 20; // Assuming star width is 20
-        const starBottom = star.position.y + 20; // Assuming star height is 20
-
-        const collision =
-          !star.collected &&
-          birdRight > star.position.x &&
-          100 < starRight &&
-          birdPosition < starBottom &&
-          birdBottom > star.position.y;
-
-        if (collision) {
-          setStarsCollected((prev) => prev + 1);
-          // Check star collector achievement
-          setAchievements((prev) =>
-            prev.map((achievement) =>
-              achievement.id === "star-collector" && starsCollected >= 4
-                ? { ...achievement, achieved: true }
-                : achievement
-            )
-          );
-        }
-
-        return collision ? { ...star, collected: true } : star;
-      });
-      setStars(updatedStars.filter((star) => !star.collected));
-
-      // Check collision with coins
-      const updatedCoins = coins.map((coin) => {
-        const birdRight = 100 + birdWidth;
-        const birdBottom = birdPosition + birdHeight;
-        const coinRight = coin.position.x + 20; // Assuming coin width is 20
-        const coinBottom = coin.position.y + 20; // Assuming coin height is 20
-
-        const collision =
-          !coin.collected &&
-          birdRight > coin.position.x &&
-          100 < coinRight &&
-          birdPosition < coinBottom &&
-          birdBottom > coin.position.y;
-
-        if (collision) {
-          setCoinsCollected((prev) => prev + 1);
-          // Check coin collector achievement
-          setAchievements((prev) =>
-            prev.map((achievement) =>
-              achievement.id === "coin-collector" && coinsCollected >= 9
-                ? { ...achievement, achieved: true }
-                : achievement
-            )
-          );
-        }
-
-        return collision ? { ...coin, collected: true } : coin;
-      });
-      setCoins(updatedCoins.filter((coin) => !coin.collected));
-    }
-  }, [gameStarted, gameOver, birdPosition]);
-
-  // Existing game logic for bird movement and obstacles (unchanged)
-  useEffect(() => {
-    let timeId: ReturnType<typeof setInterval>;
-
-    if (gameStarted && !gameOver) {
-      timeId = setInterval(() => {
-        setBirdPosition((position) => position + gravity);
-
-        // Check collision with ground or ceiling
-        if (birdPosition >= 560 || birdPosition <= 0) {
-          setGameOver(true);
-        }
-      }, 24);
-    }
-
-    return () => {
-      clearInterval(timeId);
-    };
-  }, [gameStarted, gameOver, birdPosition]);
-
-  useEffect(() => {
-    let obstacleId: ReturnType<typeof setInterval>;
-
-    if (gameStarted && !gameOver) {
-      obstacleId = setInterval(() => {
-        setObstacleLeft((left) => {
-          if (left <= -obstacleWidth) {
-            setScore((score) => score + 1);
-            const newGap = Math.floor(Math.random() * 60) + 140; // Gap between 140 and 200
-            const minHeight = 50;
-            const maxHeight = 600 - newGap - minHeight;
-            const newHeight = Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
-
-            setObstacleGap(newGap);
-            setObstacleHeight(newHeight);
-            return 800;
-          }
-          return left - 5;
-        });
-      }, 24);
-
-      return () => {
-        clearInterval(obstacleId);
-      };
-    }
-  }, [gameStarted, gameOver]);
-
-  useEffect(() => {
-    const hasCollision =
-      obstacleLeft >= 100 - birdWidth &&
-      obstacleLeft <= 100 + birdWidth &&
-      (birdPosition <= obstacleHeight || birdPosition >= obstacleHeight + obstacleGap);
-
-    if (hasCollision) {
-      setGameOver(true);
-    }
-  }, [birdPosition, obstacleHeight, obstacleLeft, obstacleGap]);
+  const handleClickRef = useRef<() => void>();
 
   const handleClick = () => {
-    if (!gameStarted) {
-      setGameStarted(true);
-    } else if (!gameOver) {
-      setBirdPosition((position) => position - jumpHeight);
-    }
+    // Game Over reset
     if (gameOver) {
       setGameStarted(false);
       setGameOver(false);
       setBirdPosition(300);
-      setObstacleLeft(800);
+      birdVelocityRef.current = 0;
+      setBirdRotation(0);
+      setObstacles([]);
       setScore(0);
       setCoins([]);
       setStars([]);
       setCoinsCollected(0);
       setStarsCollected(0);
+      return; // Exit here to prevent immediate jump on reset click
     }
+
+    // Start or Jump
+    if (!gameStarted) {
+      setGameStarted(true);
+      setObstacles([generateObstacle(800)]);
+    }
+
+    birdVelocityRef.current = jumpSpeed;
+    playJump();
   };
+
+  useEffect(() => {
+    handleClickRef.current = handleClick;
+  }, [handleClick]);
+
+  // Hook up spacebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent scrolling unconditionally
+      if (e.code === "Space") {
+        e.preventDefault();
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        // Prevent double firing if focused on the container (which clicks via space normally)
+        if (
+          document.activeElement !== gameContainerRef.current &&
+          document.activeElement?.tagName !== "BUTTON" &&
+          handleClickRef.current
+        ) {
+          handleClickRef.current();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-primary py-16">
@@ -398,7 +392,8 @@ const FlyCoinGame = () => {
       <div
         ref={gameContainerRef}
         onClick={handleClick}
-        className="relative w-full lg:w-[800px] h-[600px] border-4 border-white rounded-lg overflow- bg-secndary cursor-pointer"
+        className="relative w-full lg:w-[800px] border-4 border-white rounded-lg overflow-hidden bg-secondary cursor-pointer"
+        style={{ height: `${gameHeight}px` }}
       >
         {!gameStarted ? (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -413,67 +408,91 @@ const FlyCoinGame = () => {
             height: birdHeight,
             left: "100px",
             top: `${birdPosition}px`,
+            transform: `rotate(${birdRotation}deg)`,
           }}
         >
-          <div className="w-full h-full bg-black rounded-full flex items-center justify-center transform rotate-0">
-            <div className="w-3/4 h-3/4 bg-yellow-400 rounded-full">
-              <div className="w-1/4 h-1/4 bg-white rounded-full absolute top-1/4 left-1/4"></div>
+          <div className="relative w-full h-full">
+            {/* Body */}
+            <div className="absolute inset-0 bg-yellow-400 rounded-full border-[3px] border-black z-10" />
+
+            {/* Eye */}
+            <div className="absolute top-1.5 right-2 w-3.5 h-3.5 bg-white rounded-full border-[2px] border-black z-20">
+              <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-black rounded-full" />
             </div>
+
+            {/* Beak */}
+            <div className="absolute top-4 -right-2 w-5 h-3.5 bg-orange-500 border-[2px] border-black rounded-r-full z-10" />
+
+            {/* Wing */}
+            <div
+              className="absolute top-5 -left-1 w-6 h-4 bg-white border-[2px] border-black rounded-full origin-left transition-transform duration-75 z-20 shadow-sm"
+              style={{
+                transform:
+                  birdVelocityRef.current < 0
+                    ? "rotate(-25deg)"
+                    : "rotate(15deg)",
+              }}
+            />
           </div>
         </div>
 
-        {/* Obstacle blocks remain unchanged */}
-        <div
-          className="absolute bg-green-500"
-          style={{
-            width: obstacleWidth,
-            height: obstacleHeight,
-            left: obstacleLeft,
-            top: 0,
-          }}
-        />
-        <div
-          className="absolute bg-green-500"
-          style={{
-            width: obstacleWidth,
-            // height: "100%",
-            height: 600 - obstacleHeight - obstacleGap,
-
-            left: obstacleLeft,
-            top: obstacleHeight + obstacleGap,
-          }}
-        />
-
-        {/* Render stars */}
-        {stars.map((star) => (
-          <div
-            key={star.id}
-            className="absolute"
-            style={{
-              left: `${star.position.x}px`,
-              top: `${star.position.y}px`,
-            }}
-          >
-            <Star className="text-yellow-300 w-5 h-5" />
+        {obstacles.map((obs) => (
+          <div key={obs.id}>
+            <div
+              className="absolute bg-green-500"
+              style={{
+                width: obstacleWidth,
+                height: obs.height,
+                left: obs.left,
+                top: 0,
+              }}
+            />
+            <div
+              className="absolute bg-green-500"
+              style={{
+                width: obstacleWidth,
+                height: gameHeight - obs.height - obs.gap,
+                left: obs.left,
+                top: obs.height + obs.gap,
+              }}
+            />
           </div>
         ))}
 
-        {/* Render coins */}
-        {coins.map((coin) => (
-          <div
-            key={coin.id}
-            className="absolute"
-            style={{
-              left: `${coin.position.x}px`,
-              top: `${coin.position.y}px`,
-            }}
-          >
-            <Coins className="text-yellow-500 w-5 h-5" />
-          </div>
-        ))}
+        {stars.map(
+          (star) =>
+            !star.collected && (
+              <div
+                key={star.id}
+                className="absolute"
+                style={{
+                  left: `${star.position.x}px`,
+                  top: `${star.position.y}px`,
+                }}
+              >
+                <Star className="text-yellow-300 w-5 h-5" />
+              </div>
+            ),
+        )}
+
+        {coins.map(
+          (coin) =>
+            !coin.collected && (
+              <div
+                key={coin.id}
+                className="absolute"
+                style={{
+                  left: `${coin.position.x}px`,
+                  top: `${coin.position.y}px`,
+                }}
+              >
+                <Coins className="text-yellow-500 w-5 h-5" />
+              </div>
+            ),
+        )}
 
         {gameOver ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="text-white text-3xl font-bold">
               Game Over! Click to restart
             </div>
@@ -481,15 +500,15 @@ const FlyCoinGame = () => {
         ) : null}
       </div>
 
-      {/* Achievements section */}
       <div className="mt-4 bg-white/10 rounded-lg p-4 w-[800px]">
         <div className="text-white font-bold mb-2">Achievements</div>
         <div className="grid grid-cols-3 gap-4">
           {achievements.map((achievement) => (
             <div
               key={achievement.id}
-              className={`flex items-center gap-2 p-2 rounded-lg ${achievement.achieved ? "bg-white/20" : "bg-white/5"
-                }`}
+              className={`flex items-center gap-2 p-2 rounded-lg ${
+                achievement.achieved ? "bg-white/20" : "bg-white/5"
+              }`}
             >
               {achievement.icon}
               <div>
@@ -507,444 +526,3 @@ const FlyCoinGame = () => {
 };
 
 export default FlyCoinGame;
-
-// import React, { useState, useEffect, useRef } from "react";
-// import { motion, AnimatePresence } from "framer-motion";
-// import { Volume2, VolumeX, Trophy, Star, Coins } from "lucide-react";
-
-// interface PowerUp {
-//   id: number;
-//   type: "shield" | "multiplier" | "slowTime";
-//   position: { x: number; y: number };
-// }
-
-// interface Coin {
-//   id: number;
-//   position: { x: number; y: number };
-//   collected: boolean;
-// }
-
-// interface Achievement {
-//   id: string;
-//   name: string;
-//   description: string;
-//   achieved: boolean;
-//   icon: JSX.Element;
-// }
-
-// const FlyCoinGame = () => {
-//   const [gameStarted, setGameStarted] = useState(false);
-//   const [gameOver, setGameOver] = useState(false);
-//   const [score, setScore] = useState(0);
-//   const [highScore, setHighScore] = useState(0);
-//   const [birdPosition, setBirdPosition] = useState(300);
-//   const [birdRotation, setBirdRotation] = useState(0);
-//   const [obstacleHeight, setObstacleHeight] = useState(200);
-//   const [obstacleLeft, setObstacleLeft] = useState(800);
-//   const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
-//   const [coins, setCoins] = useState<Coin[]>([]);
-//   const [coinsCollected, setCoinsCollected] = useState(0);
-//   const [muted, setMuted] = useState(false);
-//   const [activeEffects, setActiveEffects] = useState({
-//     shield: false,
-//     multiplier: false,
-//     slowTime: false,
-//   });
-
-//   const gravity = activeEffects.slowTime ? 2 : 3;
-//   const jumpHeight = 70;
-//   const obstacleWidth = 60;
-//   const birdWidth = 40;
-//   const birdHeight = 40;
-//   const gameSpeed = activeEffects.slowTime ? 3 : 5;
-
-//   const gameContainerRef = useRef<HTMLDivElement>(null);
-
-//   // Sound effects
-//   const playJump = () =>
-//     !muted && new Audio("/jump.mp3").play().catch(() => {});
-//   const playCollect = () =>
-//     !muted && new Audio("/collect.mp3").play().catch(() => {});
-//   const playGameOver = () =>
-//     !muted && new Audio("/gameover.mp3").play().catch(() => {});
-
-//   // Initialize achievements
-//   const [achievements, setAchievements] = useState<Achievement[]>([
-//     {
-//       id: "first-10",
-//       name: "Getting Started",
-//       description: "Score 10 points",
-//       achieved: false,
-//       icon: <Trophy className="w-6 h-6 text-yellow-400" />,
-//     },
-//     {
-//       id: "coin-collector",
-//       name: "Coin Collector",
-//       description: "Collect 10 coins",
-//       achieved: false,
-//       icon: <Coins className="w-6 h-6 text-yellow-400" />,
-//     },
-//   ]);
-
-//   const handleGameOver = () => {
-//     setGameOver(true);
-//     playGameOver();
-//     if (score > highScore) {
-//       setHighScore(score);
-//     }
-//   };
-
-//   const resetGame = () => {
-//     setGameStarted(false);
-//     setGameOver(false);
-//     setBirdPosition(300);
-//     setObstacleLeft(800);
-//     setObstacleHeight(Math.floor(Math.random() * 400));
-//     setScore(0);
-//     setCoins([]);
-//     setCoinsCollected(0);
-//     setPowerUps([]);
-//     setActiveEffects({
-//       shield: false,
-//       multiplier: false,
-//       slowTime: false,
-//     });
-//     setBirdRotation(0);
-//   };
-
-//   // Bird jump function
-//   const handleJump = () => {
-//     if (!gameStarted) {
-//       setGameStarted(true);
-//     } else if (!gameOver) {
-//       setBirdPosition((position) => Math.max(0, position - jumpHeight));
-//       setBirdRotation(-20);
-//       playJump();
-//     }
-//   };
-
-//   // Handle click events
-//   const handleClick = () => {
-//     if (gameOver) {
-//       resetGame();
-//     } else {
-//       handleJump();
-//     }
-//   };
-
-//   // Handle keyboard controls - Fixed implementation
-//   useEffect(() => {
-//     const handleKeyPress = (event: KeyboardEvent) => {
-//       if (event.code === "Space") {
-//         event.preventDefault();
-//         if (gameOver) {
-//           resetGame();
-//         } else {
-//           handleJump();
-//         }
-//       }
-//     };
-
-//     window.addEventListener("keydown", handleKeyPress);
-//     return () => window.removeEventListener("keydown", handleKeyPress);
-//   }, [gameStarted, gameOver]); // Add dependencies that affect the jump behavior
-
-//   // Bird movement and collision detection with boundaries
-//   useEffect(() => {
-//     let timeId: ReturnType<typeof setInterval>;
-
-//     if (gameStarted && !gameOver) {
-//       timeId = setInterval(() => {
-//         setBirdPosition((position) => {
-//           const newPosition = position + gravity;
-//           if (newPosition >= 560 || newPosition <= 0) {
-//             handleGameOver();
-//             return position;
-//           }
-//           return newPosition;
-//         });
-//         setBirdRotation((rotation) => Math.min(rotation + 2, 45));
-//       }, 24);
-//     }
-
-//     return () => {
-//       if (timeId) clearInterval(timeId);
-//     };
-//   }, [gameStarted, gameOver, gravity]);
-
-//   // / Add back the spawnCoin function
-//   const spawnCoin = () => {
-//     if (Math.random() < 0.3) {
-//       // Increased spawn chance for better gameplay
-//       setCoins((prev) => [
-//         ...prev,
-//         {
-//           id: Date.now(),
-//           position: {
-//             x: 800,
-//             y: Math.random() * 500,
-//           },
-//           collected: false,
-//         },
-//       ]);
-//     }
-//   };
-
-//   // Add back obstacle movement effect
-//   useEffect(() => {
-//     let obstacleId: ReturnType<typeof setInterval>;
-
-//     if (gameStarted && !gameOver) {
-//       obstacleId = setInterval(() => {
-//         setObstacleLeft((left) => {
-//           if (left >= 100 - birdWidth && left <= 100 + birdWidth) {
-//             const birdTop = birdPosition;
-//             const birdBottom = birdPosition + birdHeight;
-
-//             if (
-//               birdTop <= obstacleHeight ||
-//               birdBottom >= obstacleHeight + 150
-//             ) {
-//               if (!activeEffects.shield) {
-//                 handleGameOver();
-//               }
-//             }
-//           }
-
-//           if (left <= -obstacleWidth) {
-//             setObstacleHeight(Math.floor(Math.random() * 300) + 100);
-//             spawnCoin();
-//             setScore((s) => s + 1);
-//             return 800;
-//           }
-//           return left - gameSpeed;
-//         });
-//       }, 24);
-//     }
-
-//     return () => {
-//       if (obstacleId) clearInterval(obstacleId);
-//     };
-//   }, [gameStarted, gameOver, birdPosition, activeEffects.shield, gameSpeed]);
-
-//   // Add back coin movement effect
-//   useEffect(() => {
-//     let coinId: ReturnType<typeof setInterval>;
-
-//     if (gameStarted && !gameOver) {
-//       coinId = setInterval(() => {
-//         setCoins((prev) =>
-//           prev
-//             .map((coin) => {
-//               if (!coin.collected) {
-//                 if (
-//                   Math.abs(coin.position.x - 100) < 40 &&
-//                   Math.abs(coin.position.y - birdPosition) < 40
-//                 ) {
-//                   playCollect();
-//                   setScore((s) => s + 2);
-//                   setCoinsCollected((c) => c + 1);
-//                   return { ...coin, collected: true };
-//                 }
-
-//                 return {
-//                   ...coin,
-//                   position: {
-//                     ...coin.position,
-//                     x: coin.position.x - gameSpeed,
-//                   },
-//                 };
-//               }
-//               return coin;
-//             })
-//             .filter((coin) => coin.position.x > -50 || coin.collected)
-//         );
-//       }, 24);
-//     }
-
-//     return () => {
-//       if (coinId) clearInterval(coinId);
-//     };
-//   }, [gameStarted, gameOver, birdPosition, gameSpeed]);
-
-//   return (
-//     <div className="flex flex-col items-center justify-center min-h-screen bg-primary">
-//       {/* Score Display */}
-//       <div className="flex items-center gap-4 mb-4">
-//         <div className="text-white text-2xl font-bold">Score: {score}</div>
-//         <div className="flex items-center gap-2 text-yellow-400">
-//           <Coins className="w-6 h-6" />
-//           <span className="text-xl">{coinsCollected}</span>
-//         </div>
-//         <div className="text-white text-xl">High Score: {highScore}</div>
-//         <button
-//           onClick={(e) => {
-//             e.stopPropagation();
-//             setMuted(!muted);
-//           }}
-//           className="p-2 rounded-full bg-white/20 hover:bg-white/30"
-//         >
-//           {muted ? (
-//             <VolumeX className="text-white" />
-//           ) : (
-//             <Volume2 className="text-white" />
-//           )}
-//         </button>
-//       </div>
-
-//       {/* Game Container */}
-//       <div
-//         ref={gameContainerRef}
-//         onClick={handleClick}
-//         className="relative w-[800px] h-[600px] border-4 border-[#FFB86C] rounded-lg overflow-hidden bg-secondary"
-//       >
-//         {/* Start Screen */}
-//         {!gameStarted && !gameOver && (
-//           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-//             <div className="text-white text-3xl font-bold mb-4">FlyCoin</div>
-//             <div className="text-white text-xl">
-//               Click or Press Space to Start
-//             </div>
-//             <div className="mt-4 text-white text-sm">
-//               Collect coins for extra points!
-//             </div>
-//           </div>
-//         )}
-
-//         {/* Bird */}
-//         <motion.div
-//           animate={{
-//             rotate: birdRotation,
-//             transition: { type: "spring", stiffness: 500 },
-//           }}
-//           className={`absolute transition-all duration-100 ease-linear ${
-//             activeEffects.shield
-//               ? "ring-4 ring-blue-400 ring-opacity-50 rounded-full"
-//               : ""
-//           }`}
-//           style={{
-//             width: birdWidth,
-//             height: birdHeight,
-//             left: "100px",
-//             top: `${birdPosition}px`,
-//           }}
-//         >
-//           <div className="relative w-full h-full">
-//             <div className="absolute inset-0 bg-black rounded-full" />
-//             <div className="absolute inset-2 bg-yellow-400 rounded-full">
-//               <div className="absolute top-1/4 left-1/4 w-1/4 h-1/4 bg-white rounded-full" />
-//             </div>
-//           </div>
-//         </motion.div>
-
-//         {/* Obstacles */}
-//         <div
-//           className="absolute bg-gradient-to-b from-green-600 to-green-500"
-//           style={{
-//             width: obstacleWidth,
-//             height: obstacleHeight,
-//             left: obstacleLeft,
-//             top: 0,
-//           }}
-//         >
-//           <div className="absolute bottom-0 w-full h-8 bg-green-700 rounded-b-lg" />
-//         </div>
-//         <div
-//           className="absolute bg-gradient-to-b from-green-500 to-green-600"
-//           style={{
-//             width: obstacleWidth,
-//             height: "100%",
-//             left: obstacleLeft,
-//             top: obstacleHeight + 150,
-//           }}
-//         >
-//           <div className="absolute top-0 w-full h-8 bg-green-700 rounded-t-lg" />
-//         </div>
-
-//         {/* Coins */}
-//         <AnimatePresence>
-//           {coins.map(
-//             (coin) =>
-//               !coin.collected && (
-//                 <motion.div
-//                   key={coin.id}
-//                   initial={{ scale: 0, rotate: 0 }}
-//                   animate={{
-//                     scale: 1,
-//                     rotate: 360,
-//                     transition: {
-//                       rotate: {
-//                         duration: 1,
-//                         repeat: Infinity,
-//                         ease: "linear",
-//                       },
-//                     },
-//                   }}
-//                   exit={{ scale: 0 }}
-//                   className="absolute w-8 h-8"
-//                   style={{
-//                     left: coin.position.x,
-//                     top: coin.position.y,
-//                   }}
-//                 >
-//                   <div className="w-full h-full rounded-full bg-yellow-400 border-2 border-yellow-600 flex items-center justify-center shadow-lg">
-//                     <Coins className="w-5 h-5 text-yellow-600" />
-//                   </div>
-//                 </motion.div>
-//               )
-//           )}
-//         </AnimatePresence>
-
-//         {/* Game Over Screen */}
-//         {gameOver && (
-//           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-//             <div className="text-white text-3xl font-bold mb-4">Game Over!</div>
-//             <div className="text-white text-xl mb-2">Score: {score}</div>
-//             <div className="text-yellow-400 text-xl mb-4">
-//               <div className="flex items-center gap-2">
-//                 <Coins className="w-6 h-6" />
-//                 <span>Coins Collected: {coinsCollected}</span>
-//               </div>
-//             </div>
-//             {score === highScore && score > 0 && (
-//               <div className="text-yellow-400 text-xl mb-4">
-//                 New High Score!
-//               </div>
-//             )}
-//             <button
-//               onClick={resetGame}
-//               className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg text-white font-bold"
-//             >
-//               Play Again
-//             </button>
-//           </div>
-//         )}
-//       </div>
-
-//       {/* Achievements */}
-//       <div className="mt-4 bg-white/10 rounded-lg p-4 w-[800px]">
-//         <div className="text-white font-bold mb-2">Achievements</div>
-//         <div className="grid grid-cols-2 gap-4">
-//           {achievements.map((achievement) => (
-//             <div
-//               key={achievement.id}
-//               className={`flex items-center gap-2 p-2 rounded-lg ${
-//                 achievement.achieved ? "bg-white/20" : "bg-white/5"
-//               }`}
-//             >
-//               {achievement.icon}
-//               <div>
-//                 <div className="text-white font-bold">{achievement.name}</div>
-//                 <div className="text-white/80 text-sm">
-//                   {achievement.description}
-//                 </div>
-//               </div>
-//             </div>
-//           ))}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default FlyCoinGame;
