@@ -6,16 +6,16 @@ import Roadmap from "./components/Home/Roadmap";
 import Sponsor from "./components/Sponsor";
 import Faq from "./components/Home/Faq";
 import Footer from "./components/Home/Footer";
-import Nav from "./components/Nav"; // Import the Nav component
+import Nav from "./components/Nav";
 import { useState } from "react";
 import FlyCoinGame from "./components/FlyCoinGame";
-import AdmissionPage from "./components/AdmissionPage";
-import IVFHospitalManagement from "./components/Home/IVFHospitalManagement";
-import IVF from "./components/Home/Ivftwo";
-import IVFClinic from "./components/Home/IVFClinic";
-import OutfitCoordinatorDemo from "./components/Home/Outfit";
-import WorklogDashboard from "./components/Home/FLow";
-import TetrisGame from "./components/Tetris";
+// import AdmissionPage from "./components/AdmissionPage";
+// import IVFHospitalManagement from "./components/Home/IVFHospitalManagement";
+// import IVF from "./components/Home/Ivftwo";
+// import IVFClinic from "./components/Home/IVFClinic";
+// import OutfitCoordinatorDemo from "./components/Home/Outfit";
+// import WorklogDashboard from "./components/Home/FLow";
+// import TetrisGame from "./components/Tetris";
 
 const App = () => {
   const [activeLink, setActiveLink] = useState<string>("Home");
